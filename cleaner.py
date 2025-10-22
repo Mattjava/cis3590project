@@ -1,6 +1,4 @@
-import pandas, mongomock
-
-db = mongomock.Database()
+import pandas
 
 raw = pandas.read_csv('biscayne_bay_dataset_oct_2022.csv')
 

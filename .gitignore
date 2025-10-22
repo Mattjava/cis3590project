@@ -1,3 +1,4 @@
 .venv
+.env
 .idea
 biscayne_bay_dataset_oct_2022.csv
