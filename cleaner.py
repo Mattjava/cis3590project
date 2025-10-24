@@ -1,33 +1,29 @@
 import pandas, os
-from pandas.api.types import is_numeric_dtype
+from pandas.api.types import is_numeric_dtype, is_any_real_numeric_dtype
 
 data_files = os.listdir("data")
 
 result = {}
 
+numeric_fields = ["Temperature (c)", "Salinity (ppt)", "ODO mg/L"]
+
 for file in data_files:
+    dropped_rows = 0
+
     file_path = os.path.join("data", file)
 
     df = pandas.read_csv(file_path)
     clean = df
 
-    columns = df.columns.to_list()
-
-    numeric_columns = [column for column in columns if is_numeric_dtype(df[column])]
-
+    print("Current size: " + str(len(df)) + "\n")
 
     mean_dict = {}
     std_dict = {}
 
 
-    for column in numeric_columns:
+    for column in numeric_fields:
         mean_dict[column] = float(df[column].mean())
         std_dict[column] = float(df[column].std())
-
-        if std_dict[column] == 0.0:
-            numeric_columns.remove(column)
-
-    print(numeric_columns)
 
     for i in range(0, len(df)):
         try:
@@ -35,17 +31,16 @@ for file in data_files:
         except Exception:
             break
 
-        for column in numeric_columns:
+        for column in numeric_fields:
             value = row[column]
-            try:
-                zscore = (value - mean_dict[column]) / std_dict[column]
-            except Exception:
-                continue
-
+            zscore = (value - mean_dict[column]) / std_dict[column]
             if abs(zscore) > 3:
-                clean.drop(i)
+                clean.drop(i, inplace=True)
+                dropped_rows += 1
+                print(f"Dropped row #{i} in {file}")
                 break
 
-    print(f"Dropped {len(df) - len(clean)} rows from {file}")
+    print(f"\nDropped {dropped_rows} rows from {file}")
+    print("New size: " + str(len(clean)) + "\n")
     result[file] = clean
 

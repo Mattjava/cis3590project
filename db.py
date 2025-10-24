@@ -9,11 +9,11 @@ mongo_url = os.getenv("MONGO_URL")
 
 client = MongoClient(mongo_url)
 
-db = client.get_database("water_data")
+db = client.get_database("water_quality_data")
+collect = db.get_collection("asv_1")
 
 
 for filename in result:
-    collection = db.get_collection(filename)
     data = result[filename].to_dict('records')
-    collection.insert_many(data)
+    collect.insert_many(data)
 
