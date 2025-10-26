@@ -23,8 +23,10 @@ SAL_FIELD = "Salinity (ppt)"
 ODO_FIELD = "ODO mg/L"
 
 TIME_FIELD = "Time hh:mm:ss"
-
 DATE_FIELD = "Date m/d/y   "
+
+LAT_FIELD = "Latitude"
+LON_FIELD = "Longitude"
 
 NUMERIC_FIELDS = [TEMP_FIELD, SAL_FIELD, ODO_FIELD]
 
@@ -209,7 +211,86 @@ def stats():
 
 @app.get("/api/outliers")
 def outliers():
-    return "outliers"
+    field_param = request.args.get("field", default="temp").lower().strip()
+    field = ALIAS_TO_FIELD.get(field_param, field_param)
+    if field not in NUMERIC_FIELDS:
+        return jsonify({"error": f"'{field_param}' is not a numeric field. Use: temperature|salinity|odo"}), 400
+
+    method = request.args.get("method", default="iqr").lower().strip()
+    k = request.args.get("k", type=float)
+    if k is None:
+        k = 1.5 if method == "iqr" else 3.0
+
+    q = build_value_filters(request.args)
+
+    proj = {
+        "_id": 0,
+        field: 1,
+        TEMP_FIELD: 1, SAL_FIELD: 1, ODO_FIELD: 1,
+        LAT_FIELD: 1, LON_FIELD: 1,
+        DATE_FIELD: 1, TIME_FIELD: 1,
+    }
+    start_str = request.args.get("start")
+    end_str = request.args.get("end")
+    start_dt = None
+    end_dt = None
+    try:
+        if start_str:
+            start_dt = datetime.fromisoformat(start_str)
+        if end_str:
+            end_dt = datetime.fromisoformat(end_str)
+    except Exception:
+        pass
+
+    docs = list(collect.find(q, proj))
+    if start_dt or end_dt:
+        docs = filter_by_time(docs, start_dt, end_dt)
+
+    values = [_to_float(d.get(field)) for d in docs]
+    values = [v for v in values if v is not None and not math.isnan(v)]
+    if not values:
+        return jsonify({"count": 0, "items": [], "thresholds": None}), 200
+
+    thresholds = {}
+    if method == "iqr":
+        vals = sorted(values)
+        n = len(vals)
+
+        def pct(p):
+            kidx = max(1, math.ceil(p * n)) - 1
+            return vals[kidx]
+
+        q1, q3 = pct(0.25), pct(0.75)
+        iqr = q3 - q1
+        low = q1 - k * iqr
+        high = q3 + k * iqr
+
+        def is_outlier(v):
+            return v < low or v > high
+
+        thresholds = {"method": "iqr", "k": k, "low": low, "high": high}
+
+    elif method in ("z", "zscore", "z-score"):
+        mean_v = statistics.fmean(values)
+        sd = statistics.pstdev(values) if len(values) > 1 else 0.0
+
+        if sd == 0.0:
+            return jsonify({"count": 0, "items": [], "thresholds": {"method": "zscore", "k": k, "mean": mean_v, "sd": sd}}), 200
+        def is_outlier(v):
+            return abs((v - mean_v) / sd) > k
+        thresholds = {"method": "zscore", "k": k, "mean": mean_v, "sd": sd}
+    else:
+        return jsonify({"error": "method must be 'iqr' or 'zscore'"}), 400
+
+    flagged = []
+    for d in docs:
+        v = _to_float(d.get(field))
+        if v is None or math.isnan(v):
+            continue
+        if is_outlier(v):
+            flagged.append(add_iso_timestamp(dict(d)))
+
+    return jsonify({"count": len(flagged), "field": field, "items": flagged, "thresholds": thresholds}), 200
 
 if __name__ == "__main__":
     app.run(port=5000, debug=True)
