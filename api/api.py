@@ -34,6 +34,7 @@ ALIAS_TO_FIELD = {
     "temp": TEMP_FIELD,
     "temperature": TEMP_FIELD,
     "sal": SAL_FIELD,
+    "salinity": SAL_FIELD,
     "odo": ODO_FIELD,
     "time": TIME_FIELD,
     "date": DATE_FIELD,
