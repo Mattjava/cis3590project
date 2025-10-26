@@ -44,3 +44,4 @@ for file in data_files:
     print("New size: " + str(len(clean)) + "\n")
     result[file] = clean
 
+    clean.to_csv(f"data/{file.split('.')[0]}_CLEANED.csv")
