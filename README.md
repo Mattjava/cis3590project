@@ -1,5 +1,8 @@
 # Water Quality Project
 
+## Demo Video
+https://youtu.be/S4NveLs9Q9I
+
 ## What is it about?
 
 This project aims at cleaning water quality data and displaying it in a clean fashion. This involves removing any outliers with Pandas and then displaying the resulting data through an API and frontend interface.
