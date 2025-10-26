@@ -1,5 +1,6 @@
 import math
 import os
+import statistics
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -22,10 +23,8 @@ SAL_FIELD = "Salinity (ppt)"
 ODO_FIELD = "ODO mg/L"
 
 TIME_FIELD = "Time hh:mm:ss"
-TIME_FIELD_SECONDARY = "Time"
 
 DATE_FIELD = "Date m/d/y   "
-DATE_FIELD_SECONDARY = "Date"
 
 NUMERIC_FIELDS = [TEMP_FIELD, SAL_FIELD, ODO_FIELD]
 
@@ -93,6 +92,30 @@ def _to_float(x):
     except Exception:
         return None
 
+def summarize(values):
+    values = [v for v in values if v is not None and not math.isnan(v)]
+
+    if not values:
+        return {"count": 0, "mean": None, "min": None, "max": None, "p25": None, "p50": None, "p75": None}
+
+    vals = sorted(values)
+    n = len(vals)
+    mean_v = statistics.fmean(vals)
+
+    def pct(p):
+        k = max(1, math.ceil(p * n)) - 1
+        return vals[k]
+
+    return {
+        "count": n,
+        "mean": mean_v,
+        "min": vals[0],
+        "max": vals[-1],
+        "p25": pct(0.25),
+        "p50": pct(0.50),
+        "p75": pct(0.75),
+    }
+
 @app.get("/api/health")
 def health():
     return jsonify({"status": "ok"}), 200
@@ -156,7 +179,33 @@ def observations():
 
 @app.get("/api/stats")
 def stats():
-    return "stats"
+    q = build_value_filters(request.args)
+    proj = {"_id": 0}
+
+    start_str = request.args.get("start")
+    end_str = request.args.get("end")
+    start_dt = None
+    end_dt = None
+    try:
+        if start_str:
+            start_dt = datetime.fromisoformat(start_str)
+        if end_str:
+            end_dt = datetime.fromisoformat(end_str)
+    except Exception:
+        pass
+
+    docs = list(collect.find(q, proj))
+    if start_dt or end_dt:
+        proj_plus = {**proj, DATE_FIELD: 1, TIME_FIELD: 1}
+        docs = list(collect.find(q, proj_plus))
+        docs = filter_by_time(docs, start_dt, end_dt)
+
+    out = {}
+    for field in NUMERIC_FIELDS:
+        vals = [_to_float(d.get(field)) for d in docs]
+        out[field] = summarize([v for v in vals if v is not None])
+
+    return jsonify(out), 200
 
 @app.get("/api/outliers")
 def outliers():
