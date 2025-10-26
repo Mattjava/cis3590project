@@ -144,7 +144,7 @@ if not df.empty:
                 lon=LON_COL,
                 zoom=16.7,
                 mapbox_style="open-street-map",
-                hover_data=df,
+                hover_data= [TEMP_COL, SAL_COL, ODO_COL, "timestamp"],
                 title="Track (Latitude/Longitude)",
             )
             # fig_geo.update_geos(fitbounds="locations")
