@@ -2,6 +2,7 @@ import pandas, os
 from pandas.api.types import is_numeric_dtype, is_any_real_numeric_dtype
 
 data_files = os.listdir("data")
+data_files = [file for file in data_files if file.find("CLEANED") == -1]
 
 result = {}
 

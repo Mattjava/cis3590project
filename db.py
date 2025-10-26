@@ -1,7 +1,10 @@
-import os, json
+import os, json, pandas
 from pymongo import MongoClient
 from dotenv import load_dotenv
-from cleaner import result
+
+data_files = os.listdir("data")
+
+data_files = [file for file in data_files if file.find("CLEANED") != -1]
 
 load_dotenv()
 
@@ -13,7 +16,10 @@ db = client.get_database("water_quality_data")
 collect = db.get_collection("asv_1")
 
 
-for filename in result:
-    data = result[filename].to_dict('records')
+for filename in data_files:
+    print("Uploading " + filename)
+    dt = pandas.read_csv("data/" + filename)
+    data = dt.to_dict('records')
     collect.insert_many(data)
 
+print("Finished saving data")
